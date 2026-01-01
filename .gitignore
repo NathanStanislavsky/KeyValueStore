@@ -1,0 +1,28 @@
+# --- OS Specific ---
+.DS_Store
+.lsoverride
+
+# --- Build Artifacts ---
+build/
+cmake-build-debug/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# --- Compiled Binaries ---
+*.o
+*.a
+*.dylib
+kv-server
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+*.swp
+
+# --- Database Data ---
+*.log
+*.sst
