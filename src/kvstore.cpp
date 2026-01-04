@@ -6,7 +6,7 @@ KVStore::KVStore(const std::string& filename) {
     memtable = std::make_unique<MemTable>();
 }
 
-void KVStore::put(const std::string& key, std::string& value) {
+void KVStore::put(const std::string& key, const std::string& value) {
     bool success = wal->write(key, value);
 
     if (!success) {

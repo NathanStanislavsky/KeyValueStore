@@ -9,7 +9,7 @@ class KVStore {
     public:
         KVStore(const std::string& directory);
 
-        void put(const std::string& key, std::string& value);
+        void put(const std::string& key, const std::string& value);
         
         std::optional<std::string> get(const std::string& key) const;
 
