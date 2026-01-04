@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(SOURCES 
     src/main.cpp
     src/wal.cpp
+    src/memtable.cpp
 )
 
 add_executable(kv-server ${SOURCES})
