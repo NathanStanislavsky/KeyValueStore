@@ -20,6 +20,8 @@ class MemTable {
 
         void clear();
 
+        std::map<std::string, std::string> flush();
+
     private:
         std::map<std::string, std::string> table;
         mutable std::shared_mutex rw_mutex;

@@ -41,3 +41,11 @@ void MemTable::clear() {
 
     table.clear();
 }
+
+std::map<std::string, std::string> MemTable::flush() {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex);
+
+    std::map<std::string, std::string> data = std::move(table);
+    
+    return data;
+}
