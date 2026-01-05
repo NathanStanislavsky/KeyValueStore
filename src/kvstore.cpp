@@ -1,8 +1,11 @@
 #include "kvstore.h"
 #include "sstable.h"
 #include <iostream>
+#include <filesystem>
 
-KVStore::KVStore(const std::string& filename) {
+namespace fs = std::filesystem;
+
+KVStore::KVStore(const std::string& filename, const std::string& directory) {
     wal = std::make_unique<WAL>(filename);
     memtable = std::make_unique<MemTable>();
 
@@ -17,6 +20,20 @@ KVStore::KVStore(const std::string& filename) {
     } else {
         std::cout << "No history found in WAL" << std::endl;
     }
+
+    if (!fs::exists(directory)) {
+        fs::create_directory(directory);
+    }
+
+    for (const auto& entry : fs::directory_iterator(directory)) {
+        if (entry.path().extension() == ".sst") {
+            sstables.push_back(entry.path().string());
+        }
+    }
+
+    std::sort(sstables.begin(), sstables.end());
+
+    std::cout << "Startup: Found " << sstables.size() << " existing SSTables in " << directory << std::endl;
 }
 
 void KVStore::put(const std::string& key, const std::string& value) {

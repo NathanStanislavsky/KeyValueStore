@@ -7,7 +7,7 @@
 
 class KVStore {
     public:
-        KVStore(const std::string& directory);
+        KVStore(const std::string& filename, const std::string& directory);
 
         void put(const std::string& key, const std::string& value);
         
@@ -18,4 +18,5 @@ class KVStore {
     private:
         std::unique_ptr<MemTable> memtable;
         std::unique_ptr<WAL> wal;
+        std::vector<std::string> sstables;
 };
