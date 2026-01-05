@@ -1,4 +1,5 @@
 #include "kvstore.h"
+#include "sstable.h"
 #include <iostream>
 
 KVStore::KVStore(const std::string& filename) {
@@ -27,6 +28,16 @@ void KVStore::put(const std::string& key, const std::string& value) {
     }
 
     memtable->put(key, value);
+
+    if (memtable->size() >= 3) {
+        std::cout << "MemTable full! Flushing to disk..." << std::endl;
+
+        std::map<std::string, std::string> data = memtable->flush();
+
+        SSTable::flush(data, "test.sst");
+
+        wal->clear();
+    }
 }
 
 std::optional<std::string> KVStore::get(const std::string& key) const {
