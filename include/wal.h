@@ -15,7 +15,10 @@ class WAL {
 
         std::vector<std::pair<std::string, std::string>> readAll();
 
+        void clear();
+
     private:
         std::fstream file_stream;
         std::mutex log_mutex;
+        std::string filename;
 };

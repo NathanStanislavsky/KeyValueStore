@@ -1,7 +1,7 @@
 #include "wal.h"
 #include <iostream>
 
-WAL::WAL(const std::string &filename)
+WAL::WAL(const std::string &filename) : filename(filename)
 {
     file_stream.open(filename, std::ios::in | std::ios::out | std::ios::app | std::ios::binary);
 
@@ -62,4 +62,15 @@ std::vector<std::pair<std::string, std::string>> WAL::readAll() {
     file_stream.seekg(0, std::ios::end);
 
     return results;
+}
+
+void WAL::clear() {
+    std::lock_guard<std::mutex> lock(log_mutex);
+
+    file_stream.close();
+
+    file_stream.open(filename, std::ios::out | std::ios::trunc);
+    file_stream.close();
+
+    file_stream.open(filename, std::ios::in | std::ios::out | std::ios::app | std::ios::binary);
 }
