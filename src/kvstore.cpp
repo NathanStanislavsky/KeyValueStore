@@ -62,10 +62,32 @@ void KVStore::put(const std::string& key, const std::string& value) {
 }
 
 std::optional<std::string> KVStore::get(const std::string& key) const {
-    return memtable->get(key);
+    auto result = memtable->get(key);
+
+    if (result) {
+        if (*result == "TOMBSTONE") {
+            return std::nullopt;
+        }
+
+        return result;
+    }
+
+    for (auto it = sstables.rbegin(); it != sstables.rend(); ++it) {
+        std::string value;
+
+        if (SSTable::search(*it, key, value)) {
+            if (value == "TOMBSTONE") {
+                return std::nullopt;
+            }
+
+            return value;
+        }
+    }
+
+    return std::nullopt;
 };
 
 void KVStore::remove(const std::string& key) {
-    wal->write(key, "DELETED");
+    wal->write(key, "TOMBSTONE");
     memtable->remove(key);
 };
