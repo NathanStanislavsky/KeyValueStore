@@ -51,7 +51,11 @@ void KVStore::put(const std::string& key, const std::string& value) {
 
         std::map<std::string, std::string> data = memtable->flush();
 
-        SSTable::flush(data, "test.sst");
+        std::string new_filename = "data_" + std::to_string(sstables.size() + 1) + ".sst";
+
+        SSTable::flush(data, new_filename);
+        
+        sstables.push_back(new_filename);
 
         wal->clear();
     }
