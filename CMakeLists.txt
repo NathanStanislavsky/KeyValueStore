@@ -10,6 +10,7 @@ set(SOURCES
     src/wal.cpp
     src/memtable.cpp
     src/kvstore.cpp
+    stc/sstable.cpp
 )
 
 add_executable(kv-server ${SOURCES})
