@@ -2,6 +2,8 @@
 #include <string>
 #include <fstream>
 #include <mutex>
+#include <vector>
+#include <utility>
 
 class WAL {
     public:
@@ -10,6 +12,8 @@ class WAL {
         ~WAL();
 
         bool write(const std::string& key, const std::string& value);
+
+        std::vector<std::pair<std::string, std::string>> readAll();
 
     private:
         std::fstream file_stream;
