@@ -89,5 +89,5 @@ std::optional<std::string> KVStore::get(const std::string& key) const {
 
 void KVStore::remove(const std::string& key) {
     wal->write(key, "TOMBSTONE");
-    memtable->remove(key);
+    memtable->put(key, "TOMBSTONE");
 };
