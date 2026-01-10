@@ -9,6 +9,10 @@
 struct SSTableMetadata {
     std::string filename;
     std::vector<IndexEntry> index;
+
+    bool operator<(const SSTableMetadata& other) const {
+        return filename < other.filename;
+    }
 };
 
 class KVStore {

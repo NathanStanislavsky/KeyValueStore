@@ -9,7 +9,7 @@ std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>&
 
     if (!file.is_open()) {
         std::cerr << "Failed to open SSTable file: " << filename << std::endl;
-        return;
+        return sparse_index;
     }
 
     long current_offset = 0;
@@ -93,6 +93,8 @@ bool SSTable::search(const std::string& filename, const std::vector<IndexEntry>&
 
     auto block_start = std::prev(entry);
     long start_offset = block_start->offset;
+
+    std::cout << "[DEBUG] Search(" << key << ") -> Index Jumped to Offset: " << start_offset << std::endl;
 
     long end_offset = -1;
     if (entry != index.end()) {

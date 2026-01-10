@@ -48,7 +48,7 @@ void KVStore::put(const std::string& key, const std::string& value) {
 
     memtable->put(key, value);
 
-    if (memtable->size() >= 3) {
+    if (memtable->size() >= 1000) {
         std::cout << "MemTable full! Flushing to disk..." << std::endl;
 
         std::map<std::string, std::string> data = memtable->flush();
