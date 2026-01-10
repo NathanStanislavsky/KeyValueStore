@@ -1,6 +1,7 @@
 #include "sstable.h"
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>& data, const std::string& filename) {
     std::ofstream file(filename, std::ios::binary);
@@ -39,7 +40,65 @@ std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>&
     return sparse_index;
 };
 
-bool SSTable::search(const std::string& filename, const std::string& key, std::string& value) {
+std::vector<IndexEntry> SSTable::loadIndex(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    std::vector<IndexEntry> sparse_index;
+
+    if (!file.is_open()) {
+        std::cerr << "Failed to open SSTable file: " << filename << std::endl;
+        return sparse_index;
+    }
+
+    long current_offset = 0;
+    int counter = 0;
+    int BLOCK_SIZE = 100;
+
+    while (file.peek() != EOF) {
+        long entry_offset = current_offset;
+
+        int key_len = 0;
+        file.read(reinterpret_cast<char*>(&key_len), sizeof(key_len));
+
+        if (file.eof()) break;
+
+        std::string key(key_len, '\0');
+        file.read(&key[0], key_len);
+
+        int value_len = 0;
+        file.read(reinterpret_cast<char*>(&value_len), sizeof(value_len));
+
+        std::string value(value_len, '\0');
+        file.read(&value[0], value_len);
+
+        if (counter % BLOCK_SIZE == 0) {
+            sparse_index.push_back({key, entry_offset});
+        }
+
+        current_offset = file.tellg();
+        counter++;
+    }
+
+    file.close();
+    return sparse_index;
+}
+
+bool SSTable::search(const std::string& filename, const std::vector<IndexEntry>& index, const std::string& key, std::string& value) {
+    auto entry = std::upper_bound(index.begin(), index.end(), key, [](const std::string& k, const IndexEntry& e) {
+        return k < e.key;
+    });
+
+    if (entry == index.begin()) {
+        return false;
+    }
+
+    auto block_start = std::prev(entry);
+    long start_offset = block_start->offset;
+
+    long end_offset = -1;
+    if (entry != index.end()) {
+        end_offset = entry->offset;
+    }
+    
     std::ifstream file(filename, std::ios::binary);
 
     if (!file.is_open()) {
@@ -47,7 +106,13 @@ bool SSTable::search(const std::string& filename, const std::string& key, std::s
         return false;
     }
 
+    file.seekg(start_offset);
+
     while (file.peek() != EOF) {
+        if (end_offset != -1 && file.tellg() >= end_offset) {
+            break; 
+        }
+
         int key_len = 0;
         int value_len = 0;
 

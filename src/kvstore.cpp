@@ -27,7 +27,9 @@ KVStore::KVStore(const std::string& filename, const std::string& directory) {
 
     for (const auto& entry : fs::directory_iterator(directory)) {
         if (entry.path().extension() == ".sst") {
-            sstables.push_back(entry.path().string());
+            std::string filename = entry.path().string();
+            std::vector<IndexEntry> index = SSTable::loadIndex(filename);
+            sstables.push_back({filename, index});
         }
     }
 
@@ -53,9 +55,9 @@ void KVStore::put(const std::string& key, const std::string& value) {
 
         std::string new_filename = "data_" + std::to_string(sstables.size() + 1) + ".sst";
 
-        SSTable::flush(data, new_filename);
+        std::vector<IndexEntry> index = SSTable::flush(data, new_filename);
         
-        sstables.push_back(new_filename);
+        sstables.push_back({new_filename, index});
 
         wal->clear();
     }
@@ -75,7 +77,7 @@ std::optional<std::string> KVStore::get(const std::string& key) const {
     for (auto it = sstables.rbegin(); it != sstables.rend(); ++it) {
         std::string value;
 
-        if (SSTable::search(*it, key, value)) {
+        if (SSTable::search(it->filename, it->index, key, value)) {
             if (value == "TOMBSTONE") {
                 return std::nullopt;
             }

@@ -12,5 +12,7 @@ class SSTable {
     public:
         static std::vector<IndexEntry> flush(const std::map<std::string, std::string>& data, const std::string& filename);
 
-        static bool search(const std::string& filename, const std::string& key, std::string& value);
+        static std::vector<IndexEntry> loadIndex(const std::string& filename);
+
+        static bool search(const std::string& filename, const std::vector<IndexEntry>& index, const std::string& key, std::string& value);
 };

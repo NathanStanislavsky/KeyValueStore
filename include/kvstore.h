@@ -4,6 +4,12 @@
 #include <memory>
 #include "memtable.h"
 #include "wal.h"
+#include "sstable.h"
+
+struct SSTableMetadata {
+    std::string filename;
+    std::vector<IndexEntry> index;
+};
 
 class KVStore {
     public:
@@ -18,5 +24,5 @@ class KVStore {
     private:
         std::unique_ptr<MemTable> memtable;
         std::unique_ptr<WAL> wal;
-        std::vector<std::string> sstables;
+        std::vector<SSTableMetadata> sstables;
 };
