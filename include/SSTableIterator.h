@@ -6,9 +6,9 @@ class SSTableIterator {
     public:
         SSTableIterator(const std::string& filename, int fileId);
 
-        void advance();
+        void next();
         
-        bool valid();
+        bool hasNext();
 
         std::string key() const;
         std::string value() const;
