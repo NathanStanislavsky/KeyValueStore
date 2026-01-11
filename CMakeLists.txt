@@ -11,6 +11,7 @@ set(SOURCES
     src/memtable.cpp
     src/kvstore.cpp
     src/sstable.cpp
+    src/bloomfilter.cpp
 )
 
 add_executable(kv-server ${SOURCES})
