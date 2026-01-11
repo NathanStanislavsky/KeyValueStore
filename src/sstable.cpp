@@ -69,8 +69,7 @@ std::vector<IndexEntry> SSTable::loadIndex(const std::string& filename, BloomFil
         int value_len = 0;
         file.read(reinterpret_cast<char*>(&value_len), sizeof(value_len));
 
-        std::string value(value_len, '\0');
-        file.read(&value[0], value_len);
+        file.seekg(value_len, std::ios::cur);
 
         bf.add(key);
 
