@@ -5,20 +5,21 @@
 #include <vector>
 #include <utility>
 
-class WAL {
-    public:
-        WAL(const std::string& filename);
+class WAL
+{
+public:
+    WAL(const std::string &filename);
 
-        ~WAL();
+    ~WAL();
 
-        bool write(const std::string& key, const std::string& value);
+    bool write(const std::string &key, const std::string &value);
 
-        std::vector<std::pair<std::string, std::string>> readAll();
+    std::vector<std::pair<std::string, std::string>> readAll();
 
-        void clear();
+    void clear();
 
-    private:
-        std::fstream file_stream;
-        std::mutex log_mutex;
-        std::string filename;
+private:
+    std::fstream file_stream;
+    std::mutex log_mutex;
+    std::string filename;
 };

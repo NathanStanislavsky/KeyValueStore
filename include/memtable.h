@@ -4,25 +4,26 @@
 #include <shared_mutex>
 #include <optional>
 
-class MemTable {
-    public:
-        MemTable();
+class MemTable
+{
+public:
+    MemTable();
 
-        ~MemTable();
+    ~MemTable();
 
-        void put(const std::string& key, const std::string& value);
-        
-        std::optional<std::string> get(const std::string& key) const;
+    void put(const std::string &key, const std::string &value);
 
-        void remove(const std::string& key);
+    std::optional<std::string> get(const std::string &key) const;
 
-        size_t size() const;
+    void remove(const std::string &key);
 
-        void clear();
+    size_t size() const;
 
-        std::map<std::string, std::string> flush();
+    void clear();
 
-    private:
-        std::map<std::string, std::string> table;
-        mutable std::shared_mutex rw_mutex;
+    std::map<std::string, std::string> flush();
+
+private:
+    std::map<std::string, std::string> table;
+    mutable std::shared_mutex rw_mutex;
 };

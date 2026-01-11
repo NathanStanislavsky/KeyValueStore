@@ -5,28 +5,36 @@
 
 namespace fs = std::filesystem;
 
-KVStore::KVStore(const std::string& filename, const std::string& directory) {
+KVStore::KVStore(const std::string &filename, const std::string &directory)
+{
     wal = std::make_unique<WAL>(filename);
     memtable = std::make_unique<MemTable>();
 
     std::vector<std::pair<std::string, std::string>> history = wal->readAll();
 
-    for (const auto& [key, value] : history) {
+    for (const auto &[key, value] : history)
+    {
         memtable->put(key, value);
     }
 
-    if (!history.empty()) {
+    if (!history.empty())
+    {
         std::cout << "Loaded " << history.size() << " entries from WAL" << std::endl;
-    } else {
+    }
+    else
+    {
         std::cout << "No history found in WAL" << std::endl;
     }
 
-    if (!fs::exists(directory)) {
+    if (!fs::exists(directory))
+    {
         fs::create_directory(directory);
     }
 
-    for (const auto& entry : fs::directory_iterator(directory)) {
-        if (entry.path().extension() == ".sst") {
+    for (const auto &entry : fs::directory_iterator(directory))
+    {
+        if (entry.path().extension() == ".sst")
+        {
             std::string filename = entry.path().string();
 
             BloomFilter bf(1000, 7);
@@ -41,17 +49,20 @@ KVStore::KVStore(const std::string& filename, const std::string& directory) {
     std::cout << "Startup: Found " << sstables.size() << " existing SSTables in " << directory << std::endl;
 }
 
-void KVStore::put(const std::string& key, const std::string& value) {
+void KVStore::put(const std::string &key, const std::string &value)
+{
     bool success = wal->write(key, value);
 
-    if (!success) {
+    if (!success)
+    {
         std::cerr << "Failed to write to WAL" << std::endl;
         return;
     }
 
     memtable->put(key, value);
 
-    if (memtable->size() >= 1000) {
+    if (memtable->size() >= 1000)
+    {
         std::cout << "MemTable full! Flushing to disk..." << std::endl;
 
         std::map<std::string, std::string> data = memtable->flush();
@@ -61,33 +72,40 @@ void KVStore::put(const std::string& key, const std::string& value) {
         BloomFilter bf(data.size(), 7);
 
         std::vector<IndexEntry> index = SSTable::flush(data, new_filename, bf);
-        
+
         sstables.push_back({new_filename, index, bf});
 
         wal->clear();
     }
 }
 
-std::optional<std::string> KVStore::get(const std::string& key) const {
+std::optional<std::string> KVStore::get(const std::string &key) const
+{
     auto result = memtable->get(key);
 
-    if (result) {
-        if (*result == "TOMBSTONE") {
+    if (result)
+    {
+        if (*result == "TOMBSTONE")
+        {
             return std::nullopt;
         }
 
         return result;
     }
 
-    for (auto it = sstables.rbegin(); it != sstables.rend(); ++it) {
-        if (!it->bloomFilter.contains(key)) {
-            continue; 
+    for (auto it = sstables.rbegin(); it != sstables.rend(); ++it)
+    {
+        if (!it->bloomFilter.contains(key))
+        {
+            continue;
         }
 
         std::string value;
 
-        if (SSTable::search(it->filename, it->index, key, value)) {
-            if (value == "TOMBSTONE") {
+        if (SSTable::search(it->filename, it->index, key, value))
+        {
+            if (value == "TOMBSTONE")
+            {
                 return std::nullopt;
             }
 
@@ -98,7 +116,8 @@ std::optional<std::string> KVStore::get(const std::string& key) const {
     return std::nullopt;
 };
 
-void KVStore::remove(const std::string& key) {
+void KVStore::remove(const std::string &key)
+{
     wal->write(key, "TOMBSTONE");
     memtable->put(key, "TOMBSTONE");
 };
