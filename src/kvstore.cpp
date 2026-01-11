@@ -28,8 +28,11 @@ KVStore::KVStore(const std::string& filename, const std::string& directory) {
     for (const auto& entry : fs::directory_iterator(directory)) {
         if (entry.path().extension() == ".sst") {
             std::string filename = entry.path().string();
-            std::vector<IndexEntry> index = SSTable::loadIndex(filename);
-            sstables.push_back({filename, index});
+
+            BloomFilter bf(1000, 7);
+
+            std::vector<IndexEntry> index = SSTable::loadIndex(filename, bf);
+            sstables.push_back({filename, index, bf});
         }
     }
 
@@ -55,9 +58,11 @@ void KVStore::put(const std::string& key, const std::string& value) {
 
         std::string new_filename = "data_" + std::to_string(sstables.size() + 1) + ".sst";
 
-        std::vector<IndexEntry> index = SSTable::flush(data, new_filename);
+        BloomFilter bf(data.size(), 7);
+
+        std::vector<IndexEntry> index = SSTable::flush(data, new_filename, bf);
         
-        sstables.push_back({new_filename, index});
+        sstables.push_back({new_filename, index, bf});
 
         wal->clear();
     }
@@ -75,6 +80,10 @@ std::optional<std::string> KVStore::get(const std::string& key) const {
     }
 
     for (auto it = sstables.rbegin(); it != sstables.rend(); ++it) {
+        if (!it->bloomFilter.contains(key)) {
+            continue; 
+        }
+
         std::string value;
 
         if (SSTable::search(it->filename, it->index, key, value)) {

@@ -5,10 +5,12 @@
 #include "memtable.h"
 #include "wal.h"
 #include "sstable.h"
+#include "bloomfilter.h"
 
 struct SSTableMetadata {
     std::string filename;
     std::vector<IndexEntry> index;
+    BloomFilter bloomFilter;
 
     bool operator<(const SSTableMetadata& other) const {
         return filename < other.filename;

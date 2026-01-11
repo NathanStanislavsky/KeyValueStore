@@ -3,7 +3,7 @@
 #include <fstream>
 #include <algorithm>
 
-std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>& data, const std::string& filename) {
+std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>& data, const std::string& filename, BloomFilter& bf) {
     std::ofstream file(filename, std::ios::binary);
     std::vector<IndexEntry> sparse_index;
 
@@ -30,6 +30,8 @@ std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>&
         file.write(reinterpret_cast<const char*>(&value_len), sizeof(value_len));
         file.write(value.c_str(), value_len);
 
+        bf.add(key);
+
         current_offset += (sizeof(int) + key.size() + sizeof(int) + value.size());
         counter++;
     }
@@ -40,7 +42,7 @@ std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string>&
     return sparse_index;
 };
 
-std::vector<IndexEntry> SSTable::loadIndex(const std::string& filename) {
+std::vector<IndexEntry> SSTable::loadIndex(const std::string& filename, BloomFilter& bf) {
     std::ifstream file(filename, std::ios::binary);
     std::vector<IndexEntry> sparse_index;
 
@@ -69,6 +71,8 @@ std::vector<IndexEntry> SSTable::loadIndex(const std::string& filename) {
 
         std::string value(value_len, '\0');
         file.read(&value[0], value_len);
+
+        bf.add(key);
 
         if (counter % BLOCK_SIZE == 0) {
             sparse_index.push_back({key, entry_offset});
