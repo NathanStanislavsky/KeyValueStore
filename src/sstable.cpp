@@ -97,8 +97,6 @@ bool SSTable::search(const std::string& filename, const std::vector<IndexEntry>&
     auto block_start = std::prev(entry);
     long start_offset = block_start->offset;
 
-    std::cout << "[DEBUG] Search(" << key << ") -> Index Jumped to Offset: " << start_offset << std::endl;
-
     long end_offset = -1;
     if (entry != index.end()) {
         end_offset = entry->offset;
