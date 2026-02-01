@@ -234,6 +234,7 @@ public:
              << endl;
 
         cout << "6. MIXED WORKLOAD TEST" << endl;
+        long long mixedDuration;
         {
             SilentCout silence;
             KVStore store(dataDir + "/wal.log", dataDir);
@@ -255,11 +256,10 @@ public:
             }
 
             auto end = high_resolution_clock::now();
-            auto duration = duration_cast<milliseconds>(end - start).count();
-
-            cout << "   Mixed workload (5,000 writes + 1,000 reads): " << duration
-                 << " ms" << endl;
+            mixedDuration = duration_cast<milliseconds>(end - start).count();
         }
+        cout << "   Mixed workload (5,000 writes + 1,000 reads): " << mixedDuration
+             << " ms" << endl;
         cout << endl;
 
         cout << "========================================" << endl;
