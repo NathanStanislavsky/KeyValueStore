@@ -51,6 +51,11 @@ void KVStore::loadSSTables()
     {
         if (entry.path().extension() == ".sst")
         {
+            if (!fs::exists(entry.path()))
+            {
+                continue;
+            }
+
             std::string filename = entry.path().filename().string();
 
             int level = 0;
@@ -76,7 +81,7 @@ void KVStore::loadSSTables()
                 }
             }
 
-            std::string full_path = entry.path().string();
+            std::string full_path = fs::absolute(entry.path()).lexically_normal().string();
             BloomFilter bf(1000, 7);
             std::vector<IndexEntry> index = SSTable::loadIndex(full_path, bf);
 
@@ -122,7 +127,8 @@ std::string KVStore::generateSSTableFilename(int level, int file_id)
 {
     std::ostringstream oss;
     oss << data_directory << "/level_" << level << "_" << file_id << ".sst";
-    return oss.str();
+    std::string path = oss.str();
+    return fs::absolute(path).lexically_normal().string();
 }
 
 void KVStore::put(const std::string &key, const std::string &value)

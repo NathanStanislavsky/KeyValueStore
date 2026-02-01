@@ -1,11 +1,20 @@
 #include "SSTableIterator.h"
 #include <iostream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 SSTableIterator::SSTableIterator(const std::string &filename, int fileId)
 {
-    file.open(filename, std::ios::binary);
     file_id = fileId;
     is_valid = false;
+
+    if (!fs::exists(filename))
+    {
+        return;
+    }
+
+    file.open(filename, std::ios::binary);
 
     if (!file.is_open())
     {
