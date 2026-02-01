@@ -12,6 +12,7 @@ set(SOURCES
     src/kvstore.cpp
     src/sstable.cpp
     src/bloomfilter.cpp
+    src/SSTableIterator.cpp
 )
 
 add_executable(kv-server ${SOURCES})
