@@ -18,6 +18,10 @@ public:
 
     void clear();
 
+    void rotate();
+
+    void clearTemp();
+
 private:
     std::fstream file_stream;
     std::mutex log_mutex;

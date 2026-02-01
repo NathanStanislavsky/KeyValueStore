@@ -14,6 +14,8 @@ class SSTable
 {
 public:
     static std::vector<IndexEntry> flush(const std::map<std::string, std::string> &data, const std::string &filename, BloomFilter &bf);
+    
+    static std::vector<IndexEntry> flush(const std::vector<std::pair<std::string, std::string>> &data, const std::string &filename, BloomFilter &bf);
 
     static std::vector<IndexEntry> loadIndex(const std::string &filename, BloomFilter &bf);
 

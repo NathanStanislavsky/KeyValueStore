@@ -80,3 +80,26 @@ void WAL::clear()
 
     file_stream.open(filename, std::ios::in | std::ios::out | std::ios::app | std::ios::binary);
 }
+
+void WAL::rotate()
+{
+    std::lock_guard<std::mutex> lock(log_mutex);
+    
+    file_stream.close();
+    
+    std::string temp_name = filename + ".tmp";
+    std::rename(filename.c_str(), temp_name.c_str());
+    
+    file_stream.open(filename, std::ios::in | std::ios::out | std::ios::app | std::ios::binary);
+    
+    if (!file_stream.is_open())
+    {
+        std::cerr << "Failed to reopen WAL file after rotation: " << filename << std::endl;
+    }
+}
+
+void WAL::clearTemp()
+{
+    std::string temp_name = filename + ".tmp";
+    std::remove(temp_name.c_str());
+}
