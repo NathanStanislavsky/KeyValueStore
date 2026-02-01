@@ -18,3 +18,6 @@ set(SOURCES
 add_executable(kv-server ${SOURCES})
 
 target_include_directories(kv-server PRIVATE include)
+
+add_executable(performance-test src/performanceTest.cpp src/wal.cpp src/memtable.cpp src/kvstore.cpp src/sstable.cpp src/bloomfilter.cpp src/SSTableIterator.cpp)
+target_include_directories(performance-test PRIVATE include)
