@@ -369,6 +369,7 @@ void KVStore::compact(int level)
     {
         std::unique_ptr<SSTableIterator> iter;
         int fileId;
+        int level;
 
         bool operator>(const IteratorWrapper &other) const
         {
@@ -376,6 +377,11 @@ void KVStore::compact(int level)
             {
                 return iter->key() > other.iter->key();
             }
+            if (level != other.level)
+            {
+                return level > other.level;
+            }
+
             return fileId < other.fileId;
         }
     };
@@ -389,7 +395,7 @@ void KVStore::compact(int level)
         auto iter = std::make_unique<SSTableIterator>(sst.filename, sst.fileId);
         if (iter->hasNext())
         {
-            minHeap.push({std::move(iter), sst.fileId});
+            minHeap.push({std::move(iter), sst.fileId, level});
         }
     }
 
@@ -398,7 +404,7 @@ void KVStore::compact(int level)
         auto iter = std::make_unique<SSTableIterator>(sst.filename, sst.fileId);
         if (iter->hasNext())
         {
-            minHeap.push({std::move(iter), sst.fileId});
+            minHeap.push({std::move(iter), sst.fileId, level + 1});
         }
     }
 
