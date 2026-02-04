@@ -132,7 +132,7 @@ void KVStore::put(const std::string &key, const std::string &value)
 
     memtable->put(key, value);
 
-    if (memtable->size() >= 1000)
+    if (memtable->size() >= 64000)
     {
         wal->rotate();
 
