@@ -134,8 +134,6 @@ void KVStore::put(const std::string &key, const std::string &value)
 
     if (memtable->size() >= 1000)
     {
-        std::cout << "MemTable full! Flushing to disk..." << std::endl;
-
         wal->rotate();
 
         std::map<std::string, std::string> data = memtable->flush();
@@ -159,6 +157,9 @@ void KVStore::put(const std::string &key, const std::string &value)
             new_filename = generateSSTableFilename(0, newFileId);
         }
 
+        if (data.empty()) {
+            return;
+        }
         BloomFilter bf(data.size(), 7);
         std::vector<IndexEntry> index = SSTable::flush(data, new_filename, bf);
         long file_size = fs::file_size(fs::path(new_filename));
@@ -278,8 +279,6 @@ void KVStore::checkCompactionStatus()
 
     if (levelToCompact >= 0)
     {
-        std::cout << "Level " << levelToCompact << " has " << fileCount
-                  << " files, triggering compaction..." << std::endl;
         compact(levelToCompact);
     }
 }
@@ -545,9 +544,6 @@ void KVStore::compact(int level)
         std::unique_lock<std::shared_mutex> lock(levels_mutex);
         active_compactions.erase(level);
     }
-
-    std::cout << "Compaction completed: Level " << level
-              << " -> Level " << (level + 1) << std::endl;
 
     checkCompactionStatus();
 }

@@ -41,7 +41,6 @@ std::vector<IndexEntry> SSTable::flush(const std::map<std::string, std::string> 
     }
 
     file.close();
-    std::cout << "Flushed SSTable to " << filename << " (" << data.size() << " keys)" << std::endl;
 
     return sparse_index;
 };
@@ -84,7 +83,6 @@ std::vector<IndexEntry> SSTable::flush(const std::vector<std::pair<std::string, 
     }
 
     file.close();
-    std::cout << "Flushed SSTable to " << filename << " (" << data.size() << " keys)" << std::endl;
 
     return sparse_index;
 }

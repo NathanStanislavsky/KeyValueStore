@@ -16,8 +16,17 @@ set(SOURCES
 )
 
 add_executable(kv-server ${SOURCES})
-
 target_include_directories(kv-server PRIVATE include)
 
-add_executable(performance-test src/performanceTest.cpp src/wal.cpp src/memtable.cpp src/kvstore.cpp src/sstable.cpp src/bloomfilter.cpp src/SSTableIterator.cpp)
-target_include_directories(performance-test PRIVATE include)
+set(BENCHMARK_SOURCES
+    src/benchmark.cpp
+    src/kvstore.cpp
+    src/memtable.cpp
+    src/sstable.cpp
+    src/SSTableIterator.cpp
+    src/wal.cpp
+    src/bloomfilter.cpp
+)
+
+add_executable(benchmark ${BENCHMARK_SOURCES})
+target_include_directories(benchmark PRIVATE include)
