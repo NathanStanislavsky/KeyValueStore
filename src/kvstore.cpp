@@ -7,6 +7,7 @@
 #include <queue>
 #include <sstream>
 #include <set>
+#include <cstdio>
 
 namespace fs = std::filesystem;
 
@@ -63,21 +64,9 @@ void KVStore::loadSSTables()
 
             if (filename.find("level_") == 0)
             {
-                size_t firstUnderscore = filename.find('_', 6);
-                size_t secondUnderscore = filename.find('_', firstUnderscore + 1);
-                if (secondUnderscore != std::string::npos)
+                if (sscanf(filename.c_str(), "level_%d_%d.sst", &level, &fileId) != 2)
                 {
-                    level = std::stoi(filename.substr(6, firstUnderscore - 6));
-                    fileId = std::stoi(filename.substr(firstUnderscore + 1, secondUnderscore - firstUnderscore - 1));
-                }
-            }
-            else if (filename.find("data_") == 0)
-            {
-                size_t dotPos = filename.find('.');
-                if (dotPos != std::string::npos)
-                {
-                    fileId = std::stoi(filename.substr(5, dotPos - 5));
-                    level = 0;
+                    continue;
                 }
             }
 
