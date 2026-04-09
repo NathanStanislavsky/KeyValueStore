@@ -4,6 +4,20 @@
 #include <mutex>
 #include <vector>
 #include <utility>
+#include <cstdint>
+
+#pragma pack(push, 1)
+struct WALRecordHeader 
+{
+    uint32_t magic;
+    uint8_t version;
+    uint8_t flags;
+    uint16_t reserved;
+    uint32_t key_len;
+    uint32_t value_len;
+    uint32_t checksum;
+};
+#pragma pack(pop)
 
 class WAL
 {
