@@ -61,25 +61,51 @@ std::vector<std::pair<std::string, std::string>> WAL::readAll()
 
     std::vector<std::pair<std::string, std::string>> results;
 
-    while (file_stream.peek() != EOF)
+    while (true)
     {
-        int len = 0;
+        WALRecordHeader header;
 
-        file_stream.read(reinterpret_cast<char *>(&len), sizeof(len));
+        // we can't read the full header of record meaning it is either EOF or header was cut off due to crash
+        if (!file_stream.read(reinterpret_cast<char *>(&header), sizeof(WALRecordHeader))) 
+        {
+            break;
+        }
+        
+        // Validate that header magic number was not corrupted
+        if (header.magic != 0xDEADBEEF)
+        {
+            break;
+        }
 
-        std::string key(len, '\0');
-        file_stream.read(&key[0], len);
+        // key was truncated
+        std::string key(header.key_len, '\0');
+        if (!file_stream.read(&key[0], header.key_len)) {
+            break;
+        }
 
-        file_stream.read(reinterpret_cast<char *>(&len), sizeof(len));
+        // value was truncated
+        std::string value(header.value_len, '\0');
+        if (file_stream.read(&value[0], header.value_len)) {
+            break;
+        }
 
-        std::string value(len, '\0');
-        file_stream.read(&value[0], len);
+        const uint8_t* header_bytes = reinterpret_cast<const uint8_t*>(&header);
+
+        // recalculate checksum using read record
+        uint32_t recalculated_crc = crc32_update(0u, header_bytes, 16);
+
+        recalculated_crc = crc32_update(recalculated_crc, reinterpret_cast<const uint8_t*>(key.data()), key.size());
+        recalculated_crc = crc32_update(recalculated_crc, reinterpret_cast<const uint8_t*>(value.data()), value.size());
+
+        recalculated_crc = recalculated_crc ^ 0xFFFFFFFF;
+
+        // compare calculated checksum and header.checksum
+        if (recalculated_crc != header.checksum) {
+            break;
+        }
 
         results.push_back({key, value});
     }
-
-    file_stream.clear();
-    file_stream.seekg(0, std::ios::end);
 
     return results;
 }
