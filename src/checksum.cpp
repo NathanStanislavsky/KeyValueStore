@@ -27,6 +27,7 @@ uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         c = crc32_table[(c ^ data[i]) & 0xFFu] ^ (c >> 8);
     }
+    return c ^ 0xFFFFFFFFu;
 }
 
 uint32_t crc32(const uint8_t* data, size_t len) {

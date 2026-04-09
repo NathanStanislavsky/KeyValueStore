@@ -1,4 +1,5 @@
 #include "wal.h"
+#include "checksum.h"
 #include <iostream>
 
 WAL::WAL(const std::string &filename) : filename(filename)
@@ -23,14 +24,28 @@ bool WAL::write(const std::string &key, const std::string &value)
 {
     std::lock_guard<std::mutex> lock(log_mutex);
 
-    int key_len = key.size();
-    int value_len = value.size();
+    WALRecordHeader header;
 
-    file_stream.write(reinterpret_cast<const char *>(&key_len), sizeof(key_len));
-    file_stream.write(key.c_str(), key_len);
+    header.magic = 0xDEADBEEF;
+    header.version = 1;
+    header.flags = 0;
+    header.reserved = 0;
+    header.key_len = key.size();
+    header.value_len = value.size();
 
-    file_stream.write(reinterpret_cast<const char *>(&value_len), sizeof(value_len));
-    file_stream.write(value.c_str(), value_len);
+    const uint8_t* header_bytes = reinterpret_cast<const uint8_t*>(&header);
+
+    uint32_t crc = crc32_update(0u, header_bytes, 16);
+
+    crc = crc32_update(crc, reinterpret_cast<const uint8_t*>(key.data()), key.size());
+    crc = crc32_update(crc, reinterpret_cast<const uint8_t*>(value.data()), value.size());
+
+    header.checksum = crc ^ 0xFFFFFFFFu;
+
+    file_stream.write(reinterpret_cast<const char *>(&header), sizeof(WALRecordHeader));
+
+    file_stream.write(key.data(), key.size());
+    file_stream.write(value.data(), value.size());
 
     file_stream.flush();
 
