@@ -85,7 +85,7 @@ std::vector<std::pair<std::string, std::string>> WAL::readAll()
 
         // value was truncated
         std::string value(header.value_len, '\0');
-        if (file_stream.read(&value[0], header.value_len)) {
+        if (!file_stream.read(&value[0], header.value_len)) {
             break;
         }
 
