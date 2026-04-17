@@ -30,6 +30,8 @@ public:
 
     std::vector<std::pair<std::string, std::string>> readAll();
 
+    static std::vector<std::pair<std::string, std::string>> readAllFromFile(const std::string &path);
+
     void clear();
 
     void rotate();

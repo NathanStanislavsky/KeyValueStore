@@ -13,8 +13,22 @@ namespace fs = std::filesystem;
 
 KVStore::KVStore(const std::string &filename, const std::string &directory) : data_directory(directory)
 {
-    wal = std::make_unique<WAL>(filename);
+    if (!fs::exists(data_directory)) {
+        fs::create_directory(data_directory);
+    }
+
     memtable = std::make_unique<MemTable>();
+    wal = std::make_unique<WAL>(filename);
+    
+    std::string tmp_file_path = filename + ".tmp";
+
+    if (fs::exists(tmp_file_path)) {
+        auto tmp_history = wal->readAllFromFile(tmp_file_path);
+
+        for (const auto &[key, value] : tmp_history) {
+            memtable->put(key, value);
+        }
+    }
 
     std::vector<std::pair<std::string, std::string>> history = wal->readAll();
 
@@ -30,11 +44,6 @@ KVStore::KVStore(const std::string &filename, const std::string &directory) : da
     else
     {
         std::cout << "No history found in WAL" << std::endl;
-    }
-
-    if (!fs::exists(directory))
-    {
-        fs::create_directory(directory);
     }
 
     loadSSTables();
@@ -240,7 +249,10 @@ std::optional<std::string> KVStore::get(const std::string &key) const
 
 void KVStore::remove(const std::string &key)
 {
-    wal->write(key, "TOMBSTONE");
+    if (!wal->write(key, "TOMBSTONE")) {
+        std::cerr << "Failed to write tombstone to WAL" << std::endl;
+        return;
+    }
     memtable->put(key, "TOMBSTONE");
 };
 
