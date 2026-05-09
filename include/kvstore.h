@@ -4,6 +4,8 @@
 #include <memory>
 #include <shared_mutex>
 #include <set>
+#include <cstdint>
+
 #include "memtable.h"
 #include "wal.h"
 #include "sstable.h"
@@ -26,6 +28,16 @@ struct SSTableMetadata
     }
 };
 
+enum class FlushState { NONE, ROTATED, SST_WRITTEN, COMMITTED };
+
+struct FlushManifest {
+    uint64_t flushId = 0;
+    FlushState state = FlushState::NONE;
+    std::string tmpWal;
+    std::string sstFile;
+    bool valid = true;
+};
+
 class KVStore
 {
 public:
@@ -44,9 +56,17 @@ private:
     std::string data_directory;
     mutable std::shared_mutex levels_mutex;
     std::set<int> active_compactions;
+    std::string wal_filename;
+    std::string manifest_path;
+    uint64_t current_flush_id = 0;
 
     void checkCompactionStatus();
     void compact(int level);
     void loadSSTables();
     std::string generateSSTableFilename(int level, int file_id);
+
+    static FlushManifest readManifest(const std::string &manifestPath);
+    static FlushState parseFlushState(const std::string &value, bool &ok);
+    static std::string flushStateToString(FlushState s);
+    static void writeManifestAtomically(const std::string &manifestPath, const FlushManifest &m);
 };

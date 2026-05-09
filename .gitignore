@@ -26,3 +26,5 @@ kv-server
 # --- Database Data ---
 *.log
 *.sst
+
+.cache

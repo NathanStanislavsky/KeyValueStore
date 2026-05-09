@@ -4,6 +4,7 @@ project(kv-server)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(SOURCES 
     src/main.cpp
@@ -13,6 +14,7 @@ set(SOURCES
     src/sstable.cpp
     src/bloomfilter.cpp
     src/SSTableIterator.cpp
+    src/checksum.cpp
 )
 
 add_executable(kv-server ${SOURCES})
@@ -26,6 +28,7 @@ set(BENCHMARK_SOURCES
     src/SSTableIterator.cpp
     src/wal.cpp
     src/bloomfilter.cpp
+    src/checksum.cpp
 )
 
 add_executable(benchmark ${BENCHMARK_SOURCES})
