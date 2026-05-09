@@ -148,12 +148,15 @@ void KVStore::put(const std::string &key, const std::string &value) {
 
   memtable->put(key, value);
 
+  std::lock_guard<std::mutex> lock(flush_mutex);
+
   if (memtable->size() >= 64000) {
     wal->rotate();
 
-    std::string tmp_abs = fs::absolute(wal_filename + ".tmp").lexically_normal().string();
-    FlushManifest manifest = {
-        current_flush_id, FlushState::ROTATED, tmp_abs, "", true};
+    std::string tmp_abs =
+        fs::absolute(wal_filename + ".tmp").lexically_normal().string();
+    FlushManifest manifest = {current_flush_id, FlushState::ROTATED, tmp_abs,
+                              "", true};
     writeManifestAtomically(manifest_path, manifest);
 
     std::map<std::string, std::string> data = memtable->flush();
