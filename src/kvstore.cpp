@@ -64,7 +64,7 @@ void KVStore::loadSSTables() {
   levels.push_back({});
 
   int max_level = 0;
-  std::vector<std::pair<int, SSTableMetadata>> candidates;
+  std::vector<std::pair<int, std::shared_ptr<SSTableMetadata>>> candidates;
 
   for (const auto &entry : fs::directory_iterator(data_directory)) {
     if (entry.path().extension() == ".sst") {
@@ -96,10 +96,16 @@ void KVStore::loadSSTables() {
       }
       long file_size = fs::file_size(entry.path());
 
-      SSTableMetadata metadata = {full_path, index,   bf,       fileId,
-                                  min_key,   max_key, file_size};
+      auto shared_meta = std::make_shared<SSTableMetadata>();
+      shared_meta->filename = full_path;
+      shared_meta->index = index;
+      shared_meta->bloomFilter = bf;
+      shared_meta->fileId = fileId;
+      shared_meta->minKey = min_key;
+      shared_meta->maxKey = max_key;
+      shared_meta->fileSize = file_size;
 
-      candidates.push_back({level, metadata});
+      candidates.push_back({level, shared_meta});
       max_level = std::max(max_level, level);
     }
   }
@@ -108,14 +114,14 @@ void KVStore::loadSSTables() {
     levels.push_back({});
   }
 
-  for (auto &[level, metadata] : candidates) {
-    levels[level].push_back(metadata);
+  for (auto &[level, shared_meta] : candidates) {
+    levels[level].push_back(shared_meta);
   }
 
   for (auto &level : levels) {
     std::sort(level.begin(), level.end(),
-              [](const SSTableMetadata &a, const SSTableMetadata &b) {
-                return a.fileId < b.fileId;
+              [](const std::shared_ptr<SSTableMetadata> &a, const std::shared_ptr<SSTableMetadata> &b) {
+                return a->fileId < b->fileId;
               });
   }
 
@@ -163,15 +169,16 @@ void KVStore::put(const std::string &key, const std::string &value) {
         levels.push_back({});
       }
 
-      newFileId = levels[0].empty()
-                      ? 1
-                      : (std::max_element(levels[0].begin(), levels[0].end(),
-                                          [](const SSTableMetadata &a,
-                                             const SSTableMetadata &b) {
-                                            return a.fileId < b.fileId;
-                                          })
-                             ->fileId +
-                         1);
+      if (levels[0].empty()) {
+        newFileId = 1;
+      } else {
+        auto it = std::max_element(levels[0].begin(), levels[0].end(),
+                                   [](const std::shared_ptr<SSTableMetadata> &a,
+                                      const std::shared_ptr<SSTableMetadata> &b) {
+                                     return a->fileId < b->fileId;
+                                   });
+        newFileId = (*it)->fileId + 1;
+      }
 
       new_filename = generateSSTableFilename(0, newFileId);
     }
@@ -182,9 +189,14 @@ void KVStore::put(const std::string &key, const std::string &value) {
     BloomFilter bf(data.size(), 7);
     std::vector<IndexEntry> index = SSTable::flush(data, new_filename, bf);
     long file_size = fs::file_size(fs::path(new_filename));
-    SSTableMetadata metadata = {
-        new_filename,         index,    bf, newFileId, data.begin()->first,
-        data.rbegin()->first, file_size};
+    auto shared_meta = std::make_shared<SSTableMetadata>();
+    shared_meta->filename = new_filename;
+    shared_meta->index = index;
+    shared_meta->bloomFilter = bf;
+    shared_meta->fileId = newFileId;
+    shared_meta->minKey = data.begin()->first;
+    shared_meta->maxKey = data.rbegin()->first;
+    shared_meta->fileSize = file_size;
 
     manifest.state = FlushState::SST_WRITTEN;
     manifest.sstFile = new_filename;
@@ -192,7 +204,7 @@ void KVStore::put(const std::string &key, const std::string &value) {
 
     {
       std::unique_lock<std::shared_mutex> lock(levels_mutex);
-      levels[0].push_back(metadata);
+      levels[0].push_back(shared_meta);
     }
 
     wal->clearTemp();
@@ -212,46 +224,51 @@ std::optional<std::string> KVStore::get(const std::string &key) const {
     return *result == "TOMBSTONE" ? std::nullopt : result;
   }
 
-  std::shared_lock<std::shared_mutex> lock(levels_mutex);
+  std::vector<std::shared_ptr<SSTableMetadata>> files_to_search;
 
-  if (!levels.empty() && !levels[0].empty()) {
-    for (auto it = levels[0].rbegin(); it != levels[0].rend(); ++it) {
-      if (!it->minKey.empty() && !it->maxKey.empty() &&
-          (key < it->minKey || key > it->maxKey)) {
+  {
+    std::shared_lock<std::shared_mutex> lock(levels_mutex);
+
+    if (!levels.empty() && !levels[0].empty()) {
+      for (auto it = levels[0].rbegin(); it != levels[0].rend(); ++it) {
+        auto &sst_ptr = *it;
+        if (!sst_ptr->minKey.empty() && !sst_ptr->maxKey.empty() &&
+            (key < sst_ptr->minKey || key > sst_ptr->maxKey)) {
+          continue;
+        }
+
+        if (!sst_ptr->bloomFilter.contains(key)) {
+          continue;
+        }
+
+        files_to_search.push_back(sst_ptr);
+      }
+    }
+
+    for (size_t i = 1; i < levels.size(); ++i) {
+      const auto &level_files = levels[i];
+      if (level_files.empty()) {
         continue;
       }
 
-      if (!it->bloomFilter.contains(key)) {
-        continue;
-      }
+      auto it = std::lower_bound(
+          level_files.begin(), level_files.end(), key,
+          [](const std::shared_ptr<SSTableMetadata> &meta, const std::string &val) {
+            return meta->maxKey < val;
+          });
 
-      std::string value;
-      if (SSTable::search(it->filename, it->index, key, value)) {
-        return value == "TOMBSTONE" ? std::nullopt : std::make_optional(value);
+      if (it != level_files.end() && key >= (*it)->minKey && key <= (*it)->maxKey) {
+        if ((*it)->bloomFilter.contains(key)) {
+          files_to_search.push_back(*it);
+        }
       }
     }
   }
 
-  for (size_t i = 1; i < levels.size(); ++i) {
-    const auto &level_files = levels[i];
-    if (level_files.empty()) {
-      continue;
-    }
-
-    auto it = std::lower_bound(
-        level_files.begin(), level_files.end(), key,
-        [](const SSTableMetadata &meta, const std::string &val) {
-          return meta.maxKey < val;
-        });
-
-    if (it != level_files.end() && key >= it->minKey && key <= it->maxKey) {
-      if (it->bloomFilter.contains(key)) {
-        std::string value;
-        if (SSTable::search(it->filename, it->index, key, value)) {
-          return value == "TOMBSTONE" ? std::nullopt
-                                      : std::make_optional(value);
-        }
-      }
+  for (auto &sst_ptr : files_to_search) {
+    std::string value;
+    if (SSTable::search(sst_ptr->filename, sst_ptr->index, key, value)) {
+      return value == "TOMBSTONE" ? std::nullopt : std::make_optional(value);
     }
   }
 
@@ -305,8 +322,8 @@ void KVStore::compact(int level) {
     active_compactions.insert(level);
   }
 
-  std::vector<SSTableMetadata> toCompact;
-  std::vector<SSTableMetadata> nextLevelOverlapping;
+  std::vector<std::shared_ptr<SSTableMetadata>> toCompact;
+  std::vector<std::shared_ptr<SSTableMetadata>> nextLevelOverlapping;
   bool needNewLevel = false;
   int startFileId = 1;
 
@@ -323,14 +340,12 @@ void KVStore::compact(int level) {
       needNewLevel = true;
     } else {
       if (!levels[level + 1].empty()) {
-        startFileId =
-            std::max_element(
+        auto it = std::max_element(
                 levels[level + 1].begin(), levels[level + 1].end(),
-                [](const SSTableMetadata &a, const SSTableMetadata &b) {
-                  return a.fileId < b.fileId;
-                })
-                ->fileId +
-            1;
+                [](const std::shared_ptr<SSTableMetadata> &a, const std::shared_ptr<SSTableMetadata> &b) {
+                  return a->fileId < b->fileId;
+                });
+        startFileId = (*it)->fileId + 1;
       }
     }
 
@@ -338,18 +353,18 @@ void KVStore::compact(int level) {
 
     if (level + 1 < levels.size() && !levels[level + 1].empty() &&
         !toCompact.empty()) {
-      std::string minKey = toCompact[0].minKey;
-      std::string maxKey = toCompact[0].maxKey;
+      std::string minKey = toCompact[0]->minKey;
+      std::string maxKey = toCompact[0]->maxKey;
 
       for (const auto &sst : toCompact) {
-        if (sst.minKey < minKey)
-          minKey = sst.minKey;
-        if (sst.maxKey > maxKey)
-          maxKey = sst.maxKey;
+        if (sst->minKey < minKey)
+          minKey = sst->minKey;
+        if (sst->maxKey > maxKey)
+          maxKey = sst->maxKey;
       }
 
       for (const auto &sst : levels[level + 1]) {
-        bool overlaps = !(sst.maxKey < minKey || sst.minKey > maxKey);
+        bool overlaps = !(sst->maxKey < minKey || sst->minKey > maxKey);
         if (overlaps) {
           nextLevelOverlapping.push_back(sst);
         }
@@ -379,16 +394,16 @@ void KVStore::compact(int level) {
       minHeap;
 
   for (const auto &sst : toCompact) {
-    auto iter = std::make_unique<SSTableIterator>(sst.filename, sst.fileId);
+    auto iter = std::make_unique<SSTableIterator>(sst->filename, sst->fileId);
     if (iter->hasNext()) {
-      minHeap.push({std::move(iter), sst.fileId, level});
+      minHeap.push({std::move(iter), sst->fileId, level});
     }
   }
 
   for (const auto &sst : nextLevelOverlapping) {
-    auto iter = std::make_unique<SSTableIterator>(sst.filename, sst.fileId);
+    auto iter = std::make_unique<SSTableIterator>(sst->filename, sst->fileId);
     if (iter->hasNext()) {
-      minHeap.push({std::move(iter), sst.fileId, level + 1});
+      minHeap.push({std::move(iter), sst->fileId, level + 1});
     }
   }
 
@@ -399,7 +414,7 @@ void KVStore::compact(int level) {
   size_t currentBatchSize = 0;
 
   int newFileId = startFileId;
-  std::vector<SSTableMetadata> newSegmentFiles;
+  std::vector<std::shared_ptr<SSTableMetadata>> newSegmentFiles;
 
   std::string lastKey = "";
   bool isFirst = true;
@@ -412,15 +427,16 @@ void KVStore::compact(int level) {
     std::string filename = generateSSTableFilename(level + 1, newFileId);
     std::vector<IndexEntry> index = SSTable::flush(currentBatch, filename, bf);
 
-    SSTableMetadata metadata = {filename,
-                                index,
-                                bf,
-                                newFileId,
-                                currentBatch.front().first,
-                                currentBatch.back().first,
-                                static_cast<long>(fs::file_size(filename))};
+    auto shared_meta = std::make_shared<SSTableMetadata>();
+    shared_meta->filename = filename;
+    shared_meta->index = index;
+    shared_meta->bloomFilter = bf;
+    shared_meta->fileId = newFileId;
+    shared_meta->minKey = currentBatch.front().first;
+    shared_meta->maxKey = currentBatch.back().first;
+    shared_meta->fileSize = static_cast<long>(fs::file_size(filename));
 
-    newSegmentFiles.push_back(metadata);
+    newSegmentFiles.push_back(shared_meta);
     newFileId++;
     currentBatch.clear();
     currentBatchSize = 0;
@@ -483,26 +499,28 @@ void KVStore::compact(int level) {
 
     std::set<std::string> compactedFilenames;
     for (const auto &sst : toCompact) {
-      compactedFilenames.insert(sst.filename);
+      sst->markedForDeletion = true;
+      compactedFilenames.insert(sst->filename);
     }
 
     levels[level].erase(
         std::remove_if(levels[level].begin(), levels[level].end(),
-                       [&compactedFilenames](const SSTableMetadata &meta) {
-                         return compactedFilenames.find(meta.filename) !=
+                       [&compactedFilenames](const std::shared_ptr<SSTableMetadata> &meta) {
+                         return compactedFilenames.find(meta->filename) !=
                                 compactedFilenames.end();
                        }),
         levels[level].end());
 
     std::set<std::string> overlappingFilenames;
     for (const auto &sst : nextLevelOverlapping) {
-      overlappingFilenames.insert(sst.filename);
+      sst->markedForDeletion = true;
+      overlappingFilenames.insert(sst->filename);
     }
 
     levels[level + 1].erase(
         std::remove_if(levels[level + 1].begin(), levels[level + 1].end(),
-                       [&overlappingFilenames](const SSTableMetadata &meta) {
-                         return overlappingFilenames.find(meta.filename) !=
+                       [&overlappingFilenames](const std::shared_ptr<SSTableMetadata> &meta) {
+                         return overlappingFilenames.find(meta->filename) !=
                                 overlappingFilenames.end();
                        }),
         levels[level + 1].end());
@@ -511,16 +529,9 @@ void KVStore::compact(int level) {
                              newSegmentFiles.end());
 
     std::sort(levels[level + 1].begin(), levels[level + 1].end(),
-              [](const SSTableMetadata &a, const SSTableMetadata &b) {
-                return a.minKey < b.minKey;
+              [](const std::shared_ptr<SSTableMetadata> &a, const std::shared_ptr<SSTableMetadata> &b) {
+                return a->minKey < b->minKey;
               });
-  }
-
-  for (const auto &sst : toCompact) {
-    fs::remove(sst.filename);
-  }
-  for (const auto &sst : nextLevelOverlapping) {
-    fs::remove(sst.filename);
   }
 
   {

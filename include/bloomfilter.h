@@ -5,6 +5,7 @@
 class BloomFilter
 {
 public:
+    BloomFilter() : k(3) {}
     BloomFilter(size_t numKeys, int k = 3);
 
     void add(const std::string &key);

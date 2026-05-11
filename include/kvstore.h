@@ -21,6 +21,18 @@ struct SSTableMetadata {
   std::string maxKey;
   long fileSize;
 
+  bool markedForDeletion = false;
+
+  ~SSTableMetadata() {
+    if (markedForDeletion && std::filesystem::exists(filename)) {
+      std::filesystem::remove(filename);
+    }
+  }
+
+  SSTableMetadata() = default;
+  SSTableMetadata(const SSTableMetadata &) = delete;
+  SSTableMetadata &operator=(const SSTableMetadata &) = delete;
+
   bool operator<(const SSTableMetadata &other) const {
     return filename < other.filename;
   }
@@ -49,7 +61,7 @@ public:
 private:
   std::unique_ptr<MemTable> memtable;
   std::unique_ptr<WAL> wal;
-  std::vector<std::vector<SSTableMetadata>> levels;
+  std::vector<std::vector<std::shared_ptr<SSTableMetadata>>> levels;
   std::string data_directory;
   mutable std::shared_mutex levels_mutex;
   std::set<int> active_compactions;
