@@ -138,15 +138,20 @@ This metadata enables efficient binary search in Level 1+.
 
 ### Benchmarks (Tested on macOS)
 
-**Write Performance:**
-- Small keys/values (10B key, 20B value): **~72,464 writes/sec**
-- Medium keys/values (50B key, 100B value): **~69,444 writes/sec**
-- With compaction overhead: **~62,241 writes/sec**
+**Sequential Write Performance:**
+- Throughput: **~89,125 Ops/sec** 
+- Median Latency (P50): **~6.4 μs**
+- Tail Latency (P99): **~14.5 μs**
 
-**Read Performance:**
-- Average read latency: **~0.01 μs** (microseconds)
-- Read throughput: **~2,173,913 reads/sec**
-- Concurrent reads (4 threads): **~27,510 reads/sec**, **~135.55 μs** average latency
+**Read Performance (Random/Uniform):**
+- Throughput: **~12,273 Ops/sec**
+- Median Latency (P50): **~79.6 μs**
+- Tail Latency (P99): **~213.6 μs**
+
+**Concurrent Contention (Mixed Read/Write, 8 Threads):**
+- Throughput: **~20,691 Ops/sec**
+- Median Latency (P50): **~46.8 μs**
+- **Note:** Concurrent writes are currently bottlenecked by the WAL `std::fstream::flush()` holding a global lock.
 
 **Complexity:**
 - Write: O(log N) for MemTable insertion, O(1) amortized for disk writes
