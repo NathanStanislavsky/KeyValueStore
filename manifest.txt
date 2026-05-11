@@ -1,4 +1,4 @@
-state=NONE
-flush_id=0
-tmp_wal=
-sst_file=
+state=COMMITTED
+flush_id=4
+tmp_wal=/Users/nathanstanislavsky/Projects/Personal/KeyValueStore/wal.log.tmp
+sst_file=/Users/nathanstanislavsky/Projects/Personal/KeyValueStore/level_0_1.sst
