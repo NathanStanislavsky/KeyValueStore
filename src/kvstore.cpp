@@ -33,15 +33,7 @@ KVStore::KVStore(const std::string &filename, const std::string &directory)
   std::string tmp_abs =
       fs::absolute(wal_filename + ".tmp").lexically_normal().string();
 
-  if (mf.valid) {
-    if (mf.state == FlushState::COMMITTED) {
-      fs::remove(tmp_abs);
-    } else if (mf.state == FlushState::SST_WRITTEN) {
-      if (fs::exists(mf.sstFile)) {
-        fs::remove(mf.sstFile);
-      }
-    }
-  }
+
 
   if (fs::exists(tmp_abs)) {
     auto tmp_history = wal->readAllFromFile(tmp_abs);
