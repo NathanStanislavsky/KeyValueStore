@@ -1,0 +1,4 @@
+state=NONE
+flush_id=0
+tmp_wal=
+sst_file=
