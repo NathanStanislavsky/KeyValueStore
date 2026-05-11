@@ -53,11 +53,11 @@ The engine uses **level compaction** to merge and organize data:
 
 ### Thread Safety
 
-- **Shared Mutex:** Protects the `levels` data structure
-  - Shared lock: Multiple concurrent readers
-  - Exclusive lock: Single writer (compaction or flush)
-- **Active Compactions Tracking:** Prevents multiple threads from compacting the same level simultaneously
-- **Lock Minimization:** Heavy I/O operations (file reading/writing) happen without locks held
+- **Lock-Free Reads via Snapshotting:** Reads (`get()`) capture an in-memory snapshot of candidate SSTables using `std::shared_ptr` reference counting. This allows the slow disk I/O (`SSTable::search`) to occur completely lock-free, preventing reads from blocking background compactions or memtable flushes.
+- **Double-Checked Locking for Flushes:** Concurrent `put()` operations use a dedicated `flush_mutex` and a double-checked locking pattern to ensure that only a single thread can trigger a WAL rotation and MemTable flush when the size threshold is reached, completely eliminating race conditions under heavy write loads.
+- **Shared Mutex:** Protects the `levels` array during ultra-fast, in-memory structural modifications.
+- **Active Compactions Tracking:** Prevents multiple threads from compacting the same level simultaneously.
+- **Deferred File Deletion:** Files are only unlinked from the disk when their reference count drops to 0, ensuring that concurrent readers never encounter a missing file.
 
 ## Building and Running
 
@@ -115,15 +115,13 @@ The compaction algorithm uses a streaming approach to avoid memory exhaustion:
 - **No Full Buffering:** Never loads entire compaction result into memory
 - **Duplicate Resolution:** Automatically keeps newest version when keys conflict
 
-### WAL Rotation
+### Crash Recovery & Manifest Logging
 
-To prevent data loss during concurrent writes:
+To ensure absolutely zero data loss in the event of a crash, the engine uses a combination of WAL rotation and a Manifest file:
 
-1. Before MemTable flush: Rotate WAL (rename to `.tmp`, open new WAL)
-2. Flush MemTable: Write SSTable to disk
-3. After SSTable written: Delete `.tmp` file
-
-This ensures new writes during flush go to a new WAL file, preventing data loss.
+1. **Manifest State Tracking:** Tracks the exact state of the flush process (`ROTATED`, `SST_WRITTEN`, `COMMITTED`) using atomic file renames (`manifest.txt`).
+2. **WAL Rotation:** Before a MemTable flush, the WAL is rotated (renamed to `.tmp`) and a fresh WAL is opened to accept incoming traffic without blocking.
+3. **Bulletproof Startup Recovery:** On restart, the engine parses the Manifest and the file system. If an incomplete flush is detected (e.g., a `.tmp` WAL file exists but the state is not committed), it safely replays the data into the MemTable. This guarantees that data acknowledged to the user is never lost, even if a crash occurs milliseconds before a flush completes to an SSTable.
 
 ### Level Metadata Management
 
